@@ -1,0 +1,9 @@
+discord.py
+anthropic
+python-dotenv
+aiohttp
+google-generativeai
+openai
+SpeechRecognition
+pydub
+Flask
