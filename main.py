@@ -30,7 +30,6 @@ from typing import Dict, List, Optional
 import time
 import logging
 import warnings
-from keep_alive import keep_alive
 
 # Suppress Discord connection warnings/errors
 logging.getLogger('discord').setLevel(logging.CRITICAL)
@@ -6966,5 +6965,4 @@ Instructions:
 
 # Start the bot
 if __name__ == "__main__":
-    keep_alive()  # 이 줄을 추가하세요!
     client.run(DISCORD_TOKEN)
