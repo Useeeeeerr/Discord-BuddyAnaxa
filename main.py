@@ -2,7 +2,6 @@
 # Shoutout to Il Dottore, my beloved.
 
 # Imports
-import datetime
 import speech_recognition as sr
 import io
 from pydub import AudioSegment
@@ -24,7 +23,6 @@ import google.generativeai as genai
 from google.generativeai import types # type: ignore
 import openai
 from openai import AsyncOpenAI
-import asyncio
 from collections import defaultdict
 from typing import Dict, List, Optional
 import time
@@ -6330,13 +6328,13 @@ async def bonk_command(interaction: discord.Interaction):
         await send_fun_command_response(interaction, response)
 
 @tree.command(name="bite", description="Bite the bot! Chomp! 🧛")
-async def hug_command(interaction: discord.Interaction):
+async def bite_command(interaction: discord.Interaction):
     """User bites the bot - bot reacts accordingly"""
     await interaction.response.defer(ephemeral=False)
     
     user_name = interaction.user.display_name if hasattr(interaction.user, 'display_name') else interaction.user.name
     is_dm = isinstance(interaction.channel, discord.DMChannel)
-    hug_instruction = f"[SPECIAL INSTRUCTION]: {user_name} just bit you! React naturally to being bit by them. Be in pain, amused, laughing, upset, or however your character would respond to a playful bite. REMEMBER: NO ASTERISKS ROLEPLAY OR REACTIONS!"
+    bite_instruction = f"[SPECIAL INSTRUCTION]: {user_name} just bit you! React naturally to being bit by them. Be in pain, amused, laughing, upset, or however your character would respond to a playful bite. REMEMBER: NO ASTERISKS ROLEPLAY OR REACTIONS!"
     guild_id = interaction.guild.id if interaction.guild else None
 
     await add_to_history(interaction.channel.id, "user", f"[{user_name} used /bite]", interaction.user.id, guild_id, user_name=user_name)
@@ -6344,7 +6342,7 @@ async def hug_command(interaction: discord.Interaction):
     async with interaction.channel.typing():
         response = await generate_response(
             interaction.channel.id, 
-            hug_instruction, 
+            bite_instruction, 
             interaction.guild, 
             None,
             user_name, 
