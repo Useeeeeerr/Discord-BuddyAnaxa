@@ -1,0 +1,5 @@
+# nixpacks.toml
+
+[phases.setup]
+# ffmpeg 패키지를 설치합니다.
+aptPkgs = ["ffmpeg"]
