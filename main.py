@@ -6032,15 +6032,30 @@ def get_calendar_service():
 async def fetch_upcoming_events(service, minutes_ahead=15):
     """Fetches calendar events starting within the specified time."""
     if not service: return []
-    now = dt.datetime.utcnow().isoformat() + 'Z'
-    time_max = (dt.datetime.utcnow() + dt.timedelta(minutes=minutes_ahead)).isoformat() + 'Z'
+    
+    # --- START: 수정된 부분 ---
+    # 한국 시간대(KST)를 명시적으로 설정합니다.
+    # 만약 다른 시간대를 사용하신다면 'Asia/Seoul' 부분을 변경해주세요.
+    kst = dt.timezone(dt.timedelta(hours=9))
+    now_dt = dt.datetime.now(kst)
+    
+    # Google API가 요구하는 RFC3339 형식으로 변환합니다.
+    time_min = now_dt.isoformat()
+    time_max = (now_dt + dt.timedelta(minutes=minutes_ahead)).isoformat()
+    # --- END: 수정된 부분 ---
+
     try:
         events_result = await asyncio.to_thread(
-    service.events().list(
-        calendarId=GOOGLE_CALENDAR_ID, timeMin=now, timeMax=time_max,
-                maxResults=5, singleEvents=True, orderBy='startTime'
+            service.events().list(
+                calendarId=GOOGLE_CALENDAR_ID, 
+                timeMin=time_min,  # 수정된 변수 사용
+                timeMax=time_max,  # 수정된 변수 사용
+                maxResults=5, 
+                singleEvents=True, 
+                orderBy='startTime'
             ).execute
         )
+        print(f"[{dt.datetime.now()}] Calendar Check: Found {len(events_result.get('items', []))} events between {time_min} and {time_max}") # 디버깅 로그 추가
         return events_result.get('items', [])
     except Exception as e:
         print(f"Error fetching calendar events: {e}")
@@ -6073,34 +6088,57 @@ def get_tts_client():
 async def synthesize_speech(text: str, voice_params: dict) -> bytes:
     """Synthesizes speech from text and returns the audio content as bytes."""
     tts_client = get_tts_client()
-    if not tts_client: return None
-    synthesis_input = texttospeech.SynthesisInput(text=text)
-    voice = texttospeech.VoiceSelectionParams(
+    if not tts_client:
+        print("[TTS Error] TTS Client is not available.")
+        return None
+        
+    synthesis_input = texttospech.SynthesisInput(text=text)
+    voice = texttospech.VoiceSelectionParams(
         language_code=voice_params.get("language_code", "en-US"),
         name=voice_params.get("name", "en-US-Studio-O"),
-        ssml_gender=texttospeech.SsmlVoiceGender[voice_params.get("gender", "FEMALE").upper()]
+        ssml_gender=texttospech.SsmlVoiceGender[voice_params.get("gender", "FEMALE").upper()]
     )
-    audio_config = texttospeech.AudioConfig(
-        audio_encoding=texttospeech.AudioEncoding.MP3,
+    audio_config = texttospech.AudioConfig(
+        audio_encoding=texttospech.AudioEncoding.MP3,
         speaking_rate=voice_params.get("speaking_rate", 1.0),
         pitch=voice_params.get("pitch", 0.0)
     )
 
-    # --- START: 수정된 부분 ---
-    # Studio 또는 Polyglot 음성은 'gemini-1.0-pro' 모델을 명시해야 합니다.
-    if "studio" in voice.name.lower() or "polyglot" in voice.name.lower():
-        audio_config.model = "gemini-1.0-pro"
-    # --- END: 수정된 부분 ---
-
     try:
+        # 1. 첫 번째 시도: 모델 지정 없이 요청
+        print(f"[TTS] Attempting synthesis for voice '{voice.name}' without a model...")
         response = await asyncio.to_thread(
             tts_client.synthesize_speech,
             input=synthesis_input, voice=voice, audio_config=audio_config
         )
+        print(f"[TTS] Synthesis successful without a model.")
         return response.audio_content
     except Exception as e:
-        print(f"Error during speech synthesis: {e}")
-        return None
+        # 2. 첫 번째 시도 실패 시 오류 메시지 확인
+        error_message = str(e).lower()
+        print(f"[TTS] Initial synthesis failed: {error_message}")
+
+        # 3. '모델이 필요하다'는 특정 오류일 경우에만 재시도
+        if "requires a model name" in error_message:
+            print("[TTS] Retrying with the 'long' model as required by the API...")
+            audio_config.model = "long"  # 프리미엄 음성을 위한 모델 지정
+            try:
+                # 4. 두 번째 시도: 'long' 모델을 지정하여 요청
+                response = await asyncio.to_thread(
+                    tts_client.synthesize_speech,
+                    input=synthesis_input, voice=voice, audio_config=audio_config
+                )
+                print("[TTS] Synthesis successful with the 'long' model.")
+                return response.audio_content
+            except Exception as retry_e:
+                # 5. 재시도도 실패하면 최종 실패 처리
+                print(f"[TTS Error] Retry with 'long' model also failed: {retry_e}")
+                return None
+        else:
+            # 6. 다른 종류의 오류이면 그냥 실패 처리
+            print(f"[TTS Error] An unexpected error occurred: {e}")
+            return None
+        
 async def get_available_voices():
     """Gets and caches a list of available TTS voices."""
     global available_voices_cache
@@ -7118,26 +7156,54 @@ Instructions:
 async def calendar_check_task():
     """Periodically checks Google Calendar and sends notifications for upcoming events."""
     await client.wait_until_ready()
+    print("[Calendar Task] Waiting for bot to be ready...") # 1. 작업 시작 대기 로그
+    
     calendar_service = get_calendar_service()
     if not calendar_service:
-        print("Calendar service failed to initialize. Calendar task will not run.")
+        print("[Calendar Task] CRITICAL: Calendar service failed to initialize. Task will not run.") # 2. 서비스 초기화 실패 로그
         return
 
+    print("[Calendar Task] Initialized successfully. Starting main loop.") # 3. 초기화 성공 및 루프 시작 로그
     notified_event_ids = set()
+    
     while not client.is_closed():
         try:
+            # --- 루프 시작점 ---
+            print(f"\n[{dt.datetime.now()}] [Calendar Task] Starting new check cycle...") # 4. 매 분 체크 시작 로그
+
+            # 설정된 캘린더가 있는지 확인
+            if not calendar_settings:
+                print("[Calendar Task] No calendar settings found. Skipping cycle.")
+                await asyncio.sleep(60)
+                continue # 설정 없으면 1분 대기 후 다음 루프로
+
             for guild_id_str, settings in list(calendar_settings.items()):
+                print(f"[Calendar Task] Checking guild {guild_id_str}...") # 5. 서버별 설정 확인 로그
                 if settings.get('enabled') and 'channel_id' in settings and 'user_id' in settings:
-                    guild = client.get_guild(int(guild_id_str))
-                    channel = client.get_channel(settings['channel_id'])
-                    member = guild.get_member(settings['user_id']) if guild else None
+                    print(f"[Calendar Task] Guild {guild_id_str} is enabled. Fetching events...") # 6. 이벤트 가져오기 시도 로그
+                    
+                    # fetch_upcoming_events 함수가 반환하는 로그도 함께 확인됩니다.
+                    events = await fetch_upcoming_events(calendar_service, minutes_ahead=1) 
+                    
+                    if not events:
+                        print(f"[Calendar Task] No upcoming events found for guild {guild_id_str}.") # 7a. 이벤트 없음 로그
+                        continue
 
-                    if not guild or not channel or not member: continue
-
-                    events = await fetch_upcoming_events(calendar_service, minutes_ahead=1)
                     for event in events:
-                        if event['id'] in notified_event_ids: continue
+                        print(f"[Calendar Task] Found event: '{event['summary']}' (ID: {event['id']})") # 7b. 이벤트 발견 로그
+                        if event['id'] in notified_event_ids:
+                            print(f"[Calendar Task] Event '{event['summary']}' already notified. Skipping.") # 8. 이미 알림 보낸 이벤트 스킵 로그
+                            continue
                         
+                        guild = client.get_guild(int(guild_id_str))
+                        channel = client.get_channel(settings['channel_id'])
+                        member = guild.get_member(settings['user_id']) if guild else None
+
+                        if not guild or not channel or not member:
+                            print(f"[Calendar Task] WARNING: Guild/Channel/Member not found for event '{event['summary']}'. Skipping.")
+                            continue
+
+                        print(f"[Calendar Task] Generating response for event '{event['summary']}'...") # 9. 응답 생성 시도 로그
                         event_summary = event['summary']
                         instruction = (
                             f"[SPECIAL INSTRUCTION]: You just checked your Google Calendar and noticed an event is about to start: '{event_summary}'. "
@@ -7153,12 +7219,18 @@ async def calendar_check_task():
                         )
 
                         if bot_response and not bot_response.startswith("❌"):
+                            print(f"[Calendar Task] Sending message to channel {channel.id} for event '{event['summary']}'.") # 10. 메시지 전송 시도 로그
                             await channel.send(bot_response)
                             notified_event_ids.add(event['id'])
+                            print(f"[Calendar Task] Successfully sent notification for event '{event['summary']}'.") # 11. 전송 성공 로그
+                        else:
+                            print(f"[Calendar Task] FAILED to generate or send message for event '{event['summary']}'. Response: {bot_response}") # 12. 전송 실패 로그
         except Exception as e:
-            print(f"Error in calendar check task: {e}")
+            print(f"[Calendar Task] An error occurred in the main loop: {e}") # 루프 내 오류 발생 시 로그
+        
+        # --- 1분 대기 ---
         await asyncio.sleep(60)
-
+        
 async def proactive_message_task():
     """Periodically sends proactive messages based on configured modes."""
     await client.wait_until_ready()
