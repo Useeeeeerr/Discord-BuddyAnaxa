@@ -30,9 +30,8 @@ import logging
 import warnings
 # New Imports for Calendar and Advanced Scheduling
 from google.cloud import texttospeech
-from google.auth.transport.requests import Request
-from google.oauth2.credentials import Credentials
-from google_auth_oauthlib.flow import InstalledAppFlow
+from google.oauth2 import service_account
+from google.api_core.client_options import ClientOptions
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 import datetime as dt
@@ -52,11 +51,22 @@ CLAUDE_API_KEY = os.getenv('CLAUDE_API_KEY')
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 CUSTOM_API_KEY = os.getenv('CUSTOM_API_KEY')
-# OPENROUTER_API_KEY = os.getenv('OPENROUTER_API_KEY')
-
+OPENROUTER_API_KEY = os.getenv('OPENROUTER_API_KEY')
+GOOGLE_CREDENTIALS_JSON = os.getenv('GOOGLE_CREDENTIALS_JSON')
+GOOGLE_CALENDAR_ID = os.getenv('GOOGLE_CALENDAR_ID')
+GOOGLE_TTS_API_KEY = os.getenv('GOOGLE_TTS_API_KEY')
+google_creds_dict = None
+if GOOGLE_CREDENTIALS_JSON:
+    try:
+        # 환경 변수에서 JSON 문자열을 파이썬 딕셔너리로 변환
+        google_creds_dict = json.loads(GOOGLE_CREDENTIALS_JSON)
+    except json.JSONDecodeError:
+        print("ERROR: GOOGLE_CREDENTIALS_JSON 환경 변수의 형식이 올바르지 않습니다.")
+        
 if not DISCORD_TOKEN:
     print("Error: DISCORD_TOKEN environment variable not set.")
     exit(1)
+    
 
 # Discord client setup
 intents = discord.Intents.default()
@@ -5997,38 +6007,23 @@ async def view_memory(interaction: discord.Interaction, memory_number: int):
 # --------------------------------------------------------------------------------
 
 # --- Google Calendar Functions ---
+# vvvvvvvvvv 이 블록 전체를 복사해서 기존 코드를 덮어쓰세요 vvvvvvvvvv
+
+# --- Google Calendar Functions ---
 SCOPES = ['https://www.googleapis.com/auth/calendar.readonly']
 
 def get_calendar_service():
-    """Creates and returns a Google Calendar API service object."""
-    creds = None
-    if os.path.exists('token.json'):
-        creds = Credentials.from_authorized_user_file('token.json', SCOPES)
-    
-    if not creds or not creds.valid:
-        if creds and creds.expired and creds.refresh_token:
-            try:
-                creds.refresh(Request())
-            except Exception as e:
-                print(f"Error refreshing token: {e}. Please re-authenticate.")
-                if os.path.exists('token.json'): os.remove('token.json')
-                creds = None
-        
-        if not creds:
-            if not os.path.exists('credentials.json'):
-                print("ERROR: credentials.json not found.")
-                return None
-            flow = InstalledAppFlow.from_client_secrets_file('credentials.json', SCOPES)
-            creds = flow.run_local_server(port=0)
-        
-        with open('token.json', 'w') as token:
-            token.write(creds.to_json())
-    
+    """Creates a Google Calendar service object using credentials from environment variables."""
+    if not google_creds_dict:
+        print("ERROR: Google credentials not loaded from environment for Calendar.")
+        return None
     try:
+        creds = service_account.Credentials.from_service_account_info(
+            google_creds_dict, scopes=SCOPES)
         service = build('calendar', 'v3', credentials=creds)
         return service
-    except HttpError as error:
-        print(f'An error occurred with Google API: {error}')
+    except Exception as e:
+        print(f'An error occurred creating calendar service: {e}')
         return None
 
 async def fetch_upcoming_events(service, minutes_ahead=15):
@@ -6038,8 +6033,8 @@ async def fetch_upcoming_events(service, minutes_ahead=15):
     time_max = (dt.datetime.utcnow() + dt.timedelta(minutes=minutes_ahead)).isoformat() + 'Z'
     try:
         events_result = await asyncio.to_thread(
-            service.events().list(
-                calendarId='primary', timeMin=now, timeMax=time_max,
+    service.events().list(
+        calendarId=GOOGLE_CALENDAR_ID, timeMin=now, timeMax=time_max,
                 maxResults=5, singleEvents=True, orderBy='startTime'
             ).execute
         )
@@ -6050,12 +6045,27 @@ async def fetch_upcoming_events(service, minutes_ahead=15):
 
 # --- Google Text-to-Speech Functions ---
 def get_tts_client():
-    """Returns an authenticated Text-to-Speech client."""
-    try:
-        return texttospeech.TextToSpeechClient()
-    except Exception as e:
-        print(f"Failed to create TTS client: {e}")
-        return None
+    """Returns an authenticated Text-to-Speech client using credentials from environment variables."""
+    # 방법 1: API 키가 설정되어 있으면 우선적으로 사용 (가장 간단)
+    if GOOGLE_TTS_API_KEY:
+        try:
+            opts = ClientOptions(api_key=GOOGLE_TTS_API_KEY)
+            return texttospeech.TextToSpeechClient(client_options=opts)
+        except Exception as e:
+            print(f"Failed to create TTS client with API Key: {e}")
+            return None
+    
+    # 방법 2: API 키가 없으면 서비스 계정 정보를 사용 (Calendar와 동일한 방식)
+    if google_creds_dict:
+        try:
+            creds = service_account.Credentials.from_service_account_info(google_creds_dict)
+            return texttospeech.TextToSpeechClient(credentials=creds)
+        except Exception as e:
+            print(f"Failed to create TTS client with Service Account: {e}")
+            return None
+
+    print("ERROR: TTS 인증을 위한 GOOGLE_TTS_API_KEY 또는 GOOGLE_CREDENTIALS_JSON 환경 변수가 설정되지 않았습니다.")
+    return None
 
 async def synthesize_speech(text: str, voice_params: dict) -> bytes:
     """Synthesizes speech from text and returns the audio content as bytes."""
