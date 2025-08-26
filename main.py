@@ -7180,6 +7180,7 @@ async def proactive_message_task():
         except Exception as e:
             print(f"Error in proactive message task: {e}")
 
+
 # --------------------------------------------------------------------------------
 # / / / / / / / / / /  NEW CALENDAR & PROACTIVE COMMANDS / / / / / / / / / / / /
 # --------------------------------------------------------------------------------
@@ -7327,6 +7328,7 @@ async def voice_name_autocomplete(interaction: discord.Interaction, current: str
     if not voices: return []
     return [app_commands.Choice(name=f"{v.name} ({v.language_codes[0]})", value=v.name) for v in voices if current.lower() in v.name.lower()][:25]
 
+
 # --------------------------------------------------------------------------------
 # / / / / / / / / / / / /  NEW INTERACTIVE COMMANDS / / / / / / / / / / / / / / /
 # --------------------------------------------------------------------------------
@@ -7457,6 +7459,8 @@ async def dream_interpreter(interaction: discord.Interaction, dream: str):
     if bot_response and not bot_response.startswith("❌"):
         await interaction.followup.send(f"**Entering the dreamscape of {user_name}...**\n\n{bot_response}")
     else:
-        await interaction.followup.send(bot_response or "❌ I fell asleep.", ephemeral=True) # Start the bot
+        await interaction.followup.send(bot_response or "❌ I fell asleep.", ephemeral=True) 
+        
+        # Start the bot
 if __name__ == "__main__":
     client.run(DISCORD_TOKEN)
