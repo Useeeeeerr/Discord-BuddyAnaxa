@@ -2564,7 +2564,7 @@ def get_system_prompt(guild_id: int, guild: discord.Guild = None, query: str = N
     combined_prompt = f"You are {bot_persona_name}, a real person. {system_prompt}\n\n<persona>This is your persona:\n{personality_prompt}</persona>"
 
     # Add emoji information
-    if prompt_type == "conversational" or "conversational nsfw":
+    if prompt_type in ["conversational", "conversational nsfw"]:
         if guild and not is_dm:
             emoji_info = get_guild_emojis(guild)
             combined_prompt += emoji_info
