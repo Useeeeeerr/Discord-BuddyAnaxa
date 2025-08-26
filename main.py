@@ -6092,7 +6092,7 @@ async def synthesize_speech(text: str, voice_params: dict) -> bytes:
         print("[TTS Error] TTS Client is not available.")
         return None
         
-    synthesis_input = texttospech.SynthesisInput(text=text)
+    synthesis_input = texttospeech.SynthesisInput(text=text)
     voice = texttospech.VoiceSelectionParams(
         language_code=voice_params.get("language_code", "en-US"),
         name=voice_params.get("name", "en-US-Studio-O"),
