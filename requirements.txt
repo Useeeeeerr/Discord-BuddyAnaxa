@@ -1,9 +1,17 @@
+# Discord & AI
 discord.py
 anthropic
 python-dotenv
 aiohttp
 google-generativeai
 openai
+
+# Audio Processing
 SpeechRecognition
 pydub
-Flask
+
+# Google Cloud Services (Calendar & TTS)
+google-cloud-texttospeech
+google-api-python-client
+google-auth-oauthlib
+google-auth-httplib2
