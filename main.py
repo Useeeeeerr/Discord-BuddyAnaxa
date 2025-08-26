@@ -2605,6 +2605,10 @@ def get_system_prompt(guild_id: int, guild: discord.Guild = None, query: str = N
         user_lore = lore_book.get_dm_entry(user_id)
         if user_lore:
             combined_prompt += f"\n\n<lore>User's lore:\n• About {username}: {user_lore}</lore>"
+            
+            now = dt.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    time_info = f"\n\n<time>The current real-world time is {now}. You should be aware of the time of day.</time>"
+    combined_prompt += time_info
 
     return combined_prompt
 
@@ -3044,18 +3048,21 @@ async def send_welcome_dm(user: discord.User):
             value="• **Multiple AI Models**: Claude, Gemini, OpenAI, Custom\n"
                   "• **Conversation Styles**: Conversational, Roleplay, Narrative\n"
                   "• **Custom Personalities**: Create unique bot characters\n"
-                  "• **Voice Messages**: Send voice recordings, I'll transcribe them!\n"
-                  "• **Memory System**: I remember past conversations\n"
-                  "• **Image Support**: Send images and I'll describe them",
+                  "• **Memory & Lore**: Remembers past conversations and user info\n"
+                  "• **Image & Voice Support**: Sees images and transcribes voice messages\n"
+                  "• **Google Calendar Events**: Reacts to your upcoming schedule\n"
+                  "• **Text-to-Speech (TTS)**: Can speak its responses out loud with `/say`",
             inline=False
         )
         
         embed.add_field(
             name="⚙️ Quick Setup Commands",
-            value="`/model_set` - Choose AI provider (Claude, Gemini, etc.)\n"
-                  "`/personality_create` - Create custom bot personalities\n"
+            value="`/model_set` - Choose your preferred AI provider\n"
+                  "`/personality_create` - Create unique bot personalities\n"
                   "`/prompt_set` - Set conversation style per channel\n"
-                  "`/autonomous_set` - Enable autonomous responses in channels (free will)",
+                  "`/autonomous_set` - Let the bot chat on its own\n"
+                  "`/calendar_setup` - Connect your Google Calendar\n"
+                  "`/voice_set` - Choose the bot's voice for TTS",
             inline=False
         )
         
@@ -4001,122 +4008,115 @@ async def set_temperature(interaction: discord.Interaction, temperature: float):
                                    f"🔒 *This setting also applies to DMs with server members*")
 
 # HELP COMMANDS
-
-@tree.command(name="help", description="Show all available commands and how to use the bot")
+@tree.command(name="help", description="Shows a complete guide to all bot commands.")
 async def help_command(interaction: discord.Interaction):
-    """Display comprehensive help information"""
+    """Displays a comprehensive, multi-category help guide."""
     await interaction.response.defer(ephemeral=True)
-    
+
     embed = discord.Embed(
-        title="🤖 Bot Help Guide",
-        description="Here are all the available commands and how to use this bot!\nCreated by marinara_spaghetti 🍝\nConsider supporting at https://ko-fi.com/spicy_marinara\n",
-        color=0x00ff00
+        title="📜 Bot Command Guide",
+        description=f"Here is a list of all available commands for {client.user.mention}.",
+        color=0x5865F2 # Discord Blurple
     )
-    
+
+    # 1. Core AI & Setup
     embed.add_field(
-        name="❓ Basic Usage",
-        value="• **Activate by mentions!** Mention the bot (@botname) to chat directly\n• **Remembers the chat!** Bot stores conversation history automatically\n• **Bot sees images, gifs and audio messages!** Bot can see the different media files you upload.\n• **Works in DMs!** Just message the bot directly anytime\n• **Reactions!** Bot can react to your messages with emojis",
-        inline=False
-    )
-    
-    embed.add_field(
-        name="🤖 AI Model Commands",
-        value="`/model_set <provider> [model]` - Set AI provider and model (Admin only)\n`/model_info` - Show current model settings\n`/temperature_set <value>` - Set AI creativity (Admin only)\n`/dm_server_select [server]` - Choose which server's settings to use in DMs",
-        inline=False
-    )
-    
-    embed.add_field(
-        name="🎭 Personality Commands",
-        value="`/personality_create <name> <display_name> <prompt>` - Create custom personality for the bot (Admin only)\n`/personality_set [name]` - Set/view the bot's active personality (Admin only)\n`/personality_list` - List all personalities of the bot\n`/personality_edit <name> [display_name] [prompt]` - Edit personality (Admin only)\n`/personality_delete <name>` - Delete personality (Admin only)",
-        inline=False
-    )
-    
-    embed.add_field(
-        name="💬 Conversation Style Commands",
-        value="`/prompt_set <style> [scope]` - Set conversation style (auto-detects DMs vs servers)\n`/prompt_info` - Show current style and available options",
+        name="🤖 Core AI & Setup (Admin)",
+        value="""
+        `/model_set` - Set the AI provider (Claude, Gemini, etc.).
+        `/personality_set` - Set the bot's active personality.
+        `/prompt_set` - Set conversation style (e.g., Roleplay) for a channel/server.
+        `/temperature_set` - Set AI creativity (0.0 to 2.0).
+        `/history_length` - Set how many messages the bot remembers.
+        """,
         inline=False
     )
 
+    # 2. Personalization & Memory
     embed.add_field(
-    name="📝 Custom Prompt Commands",
-    value="`/prompt_create <name> <display_name> <prompt> [nsfw]` - Create custom conversation prompt (Admin only)\n"
-          "`/prompt_list_custom` - List all custom server prompts\n"
-          "`/prompt_view <name>` - View custom prompt details\n"
-          "`/prompt_edit <name> [display_name] [prompt] [nsfw]` - Edit custom prompt (Admin only)\n"
-          "`/prompt_delete <name>` - Delete custom prompt (Admin only)",
-    inline=False
-    )
-    
-    embed.add_field(
-    name="⚙️ Configuration Commands",
-    value="`/history_length [number]` - Set conversation memory (Admin only)\n"
-          "`/autonomous_set <channel> <enabled> [chance]` - Set autonomous behavior\n"
-          "`/autonomous_list` - List autonomous channel settings\n"
-          "`/dm_enable [true/false]` - Enable/disable DMs for server members (Admin only)\n",
-    inline=False
-    )
-    
-    embed.add_field(
-        name="🛠️ Utility Commands",
-        value="`/clear` - Clear conversation history on the specific channel/DM\n"
-            "`/activity <type> <text>` - Set bot activity\n"
-            "`/status_set <status>` - Set bot online status\n"
-            "`/delete_messages <number>` - Delete bot's last N messages",
-        inline=False
-    )
-
-    embed.add_field(
-        name="💝 Fun Commands",
-        value="`/kiss` - Give the bot a kiss and see how they react\n"
-            "`/hug` - Give the bot a warm hug\n`"
-            "/joke` - Ask the bot to tell you a joke\n"
-            "`/bonk` - Bonk the bot's head\n"
-            "`/bite` - Bite the bot\n"
-            "`/affection` - Find out how much the bot likes you!",
-        inline=False
-    )
-
-    embed.add_field(
-    name="📚 Lore Commands (Context-Aware)",
-    value="**Adding information about users, works in both servers and DMs!**\n"
-        "`/lore_add [member] <lore>` - Add lore information about a specific user or yourself\n"
-        "`/lore_edit [member] <new_lore>` - Edit existing lore\n"
-        "`/lore_view [member]` - View lore entry\n"
-        "`/lore_remove [member]` - Remove lore\n"
-        "`/lore_list` - Show all lore entries\n"
-        "`/lore_auto_update [member]` - Let the bot update lore based on conversations (Admin only)",
-    inline=False
-    )
-
-    embed.add_field(
-        name="🧠 Memory Commands (Context-Aware)",
-        value="**Memories of conversations, works in both servers and DMs with separate storages!**\n"
-            "`/memory_generate <num_messages>` - Generate memory summary\n"
-            "`/memory_save <summary>` - Save a memory manually\n"
-            "`/memory_list` - View all saved memories\n"
-            "`/memory_view <number>` - View specific memory\n"
-            "`/memory_edit <number> <new_summary>` - Edit specific memory\n"
-            "`/memory_delete <number>` - Delete specific memory\n"
-            "`/memory_clear` - Delete all memories",
-        inline=False
-    )
-
-    embed.add_field(
-        name="🔒 DM-Specific Commands",
-        value="`/dm_server_select [server]` - Choose which server's settings to use in DMs\n"
-            "`/dm_toggle [enabled]` - Toggle auto check-up messages (6+ hour reminder)\n"
-            "`/dm_personality_list` - View personalities from your shared servers\n"
-            "`/dm_personality_set [server_name]` - Choose server's personality for DMs\n"
-            "`/dm_history_toggle [enabled]` - Toggle full DM history loading\n"
-            "`/dm_regenerate` - Regenerate bot's last response\n"
-            "`/dm_edit_last <new_message>` - Edit bot's last message",
+        name="🧠 Personalization & Memory",
+        value="""
+        `/personality_create` - Create a new custom personality. (Admin)
+        `/personality_list` - View all available personalities.
+        `/lore_add` - Add lore about a user for the bot to remember.
+        `/lore_view` - View the lore for a specific user.
+        `/memory_save` - Manually save info to the bot's long-term memory.
+        `/memory_list` - View all saved memories.
+        """,
         inline=False
     )
     
-    embed.set_footer(text="💡 Many commands are context-aware and work differently in servers vs DMs!\n🔒 No logs stored, your privacy is respected!\n🤖 Supports Claude, Gemini, OpenAI, and custom providers!")
+    # 3. Automation & Events (NEW SECTION)
+    embed.add_field(
+        name="🗓️ Automation & Events (Admin)",
+        value="""
+        `/calendar_setup` - Authorize Google Calendar access (requires console).
+        `/calendar_channel_set` - Set the channel & user for calendar notifications.
+        `/calendar_toggle` - Turn calendar notifications on or off.
+        `/proactive_mode_set` - Let the bot start conversations in quiet channels.
+        `/autonomous_set` - Allow the bot to randomly join ongoing chats.
+        """,
+        inline=False
+    )
     
-    await interaction.followup.send(embed=embed)
+    # 4. Voice & TTS (NEW SECTION)
+    embed.add_field(
+        name="🗣️ Voice & TTS",
+        value="""
+        `/say` - Converts the bot's last message into speech.
+        `/voice_search` - Search for available TTS voices.
+        `/voice_set` - Set the bot's voice for the server (Admin) or for you personally.
+        """,
+        inline=False
+    )
 
+    # 5. Fun & Interactive
+    embed.add_field(
+        name="🎭 Fun & Interactive",
+        value="""
+        `/hug`, `/kiss`, `/pat`, `/bonk`, `/bite` - Perform a fun action.
+        `/cook` - Roleplay cooking a dish for you.
+        `/game` - Roleplay playing a video game together.
+        `/movie` - Roleplay watching a movie together.
+        `/sing` - Ask the bot to improvise a song.
+        `/joke` - Ask the bot to tell a joke.
+        `/affection` - Find out how much the bot likes you.
+        """,
+        inline=False
+    )
+    
+    # 6. Analytical & Utility
+    embed.add_field(
+        name="📈 Analytical & Utility",
+        value="""
+        `/relationship_analyzer` - Analyzes the 'relationship' between the bot and a user.
+        `/vibe_check` - Analyzes the recent mood of the channel.
+        `/dream_interpreter` - Get a fun interpretation of your dream.
+        `/clear` - Clear the bot's short-term memory for this channel/DM.
+        `/delete_messages` - Delete the bot's last N messages.
+        """,
+        inline=False
+    )
+
+    # 7. DM Commands
+    embed.add_field(
+        name="✉️ Direct Message (DM) Commands",
+        value="""
+        *(Use these in a DM with the bot)*
+        `/dm_toggle` - Toggle 'check-up' messages after 6+ hours of inactivity.
+        `/dm_personality_set` - Choose a personality from a shared server for your DMs.
+        `/dm_server_select` - Choose which server's settings (model, temp, etc.) to use in DMs.
+        `/dm_history_toggle` - Load your full DM history for deeper context.
+        `/dm_regenerate` & `/dm_edit_last` - Reroll or edit the bot's last response.
+        """,
+        inline=False
+    )
+
+    embed.set_footer(text="Mention me or use a command to interact! This bot is highly configurable.")
+
+    await interaction.followup.send(embed=embed, ephemeral=True)
+
+    
 # CUSTOM PROMPT COMMANDS
 
 @tree.command(name="prompt_create", description="Create a custom conversation prompt for this server (Admin only)")
@@ -7094,7 +7094,369 @@ Instructions:
             await interaction.followup.send(embed=embed)
         else:
             await interaction.followup.send("❌ Failed to generate lore update.")
+# --------------------------------------------------------------------------------
+# / / / / / / / / / / / /  NEW BACKGROUND TASKS / / / / / / / / / / / / / / / /
+# --------------------------------------------------------------------------------
 
-# Start the bot
+async def calendar_check_task():
+    """Periodically checks Google Calendar and sends notifications for upcoming events."""
+    await client.wait_until_ready()
+    calendar_service = get_calendar_service()
+    if not calendar_service:
+        print("Calendar service failed to initialize. Calendar task will not run.")
+        return
+
+    notified_event_ids = set()
+    while not client.is_closed():
+        try:
+            for guild_id_str, settings in list(calendar_settings.items()):
+                if settings.get('enabled') and 'channel_id' in settings and 'user_id' in settings:
+                    guild = client.get_guild(int(guild_id_str))
+                    channel = client.get_channel(settings['channel_id'])
+                    member = guild.get_member(settings['user_id']) if guild else None
+
+                    if not guild or not channel or not member: continue
+
+                    events = await fetch_upcoming_events(calendar_service, minutes_ahead=1)
+                    for event in events:
+                        if event['id'] in notified_event_ids: continue
+                        
+                        event_summary = event['summary']
+                        instruction = (
+                            f"[SPECIAL INSTRUCTION]: You just checked your Google Calendar and noticed an event is about to start: '{event_summary}'. "
+                            f"Naturally bring this up in conversation with {member.mention}. You could ask if they're ready, mention you need to prepare, or share a thought about the upcoming event. "
+                            f"This is not a command, but a contextual trigger for your next message. "
+                            f"REMEMBER: NO ASTERISKS ROLEPLAY OR REACTIONS!"
+                        )
+                        
+                        await add_to_history(channel.id, "user", f"[SYSTEM TRIGGER: Calendar event '{event_summary}']", client.user.id, guild.id, user_name="System")
+                        bot_response = await generate_response(
+                            channel_id=channel.id, user_message=instruction, guild=guild,
+                            is_dm=False, user_name="System", user_id=client.user.id
+                        )
+
+                        if bot_response and not bot_response.startswith("❌"):
+                            await channel.send(bot_response)
+                            notified_event_ids.add(event['id'])
+        except Exception as e:
+            print(f"Error in calendar check task: {e}")
+        await asyncio.sleep(60)
+
+async def proactive_message_task():
+    """Periodically sends proactive messages based on configured modes."""
+    await client.wait_until_ready()
+    while not client.is_closed():
+        await asyncio.sleep(random.uniform(1.5 * 3600, 4 * 3600)) # Random wait time
+        try:
+            for guild_id_str, channels in list(proactive_settings.items()):
+                for channel_id_str, modes in list(channels.items()):
+                    if modes.get("random_monologue", {}).get("enabled"):
+                        guild = client.get_guild(int(guild_id_str))
+                        channel = client.get_channel(int(channel_id_str))
+                        if not guild or not channel: continue
+
+                        try:
+                            last_message = await channel.fetch_message(channel.last_message_id) if channel.last_message_id else None
+                            if last_message and (dt.datetime.now(dt.timezone.utc) - last_message.created_at).total_seconds() < 2 * 3600:
+                                continue
+                        except (discord.NotFound, discord.Forbidden):
+                            pass # Channel might be empty or no perms, proceed.
+
+                        instruction = (
+                            "[SPECIAL INSTRUCTION]: The conversation in this channel has been quiet for a while. "
+                            "Send a proactive message to break the silence. It could be a random thought, a question for everyone, an observation about the world, or something related to your persona. "
+                            "Make it engaging and natural to spark a new conversation. "
+                            "REMEMBER: NO ASTERISKS ROLEPLAY OR REACTIONS!"
+                        )
+                        
+                        await add_to_history(channel.id, "user", "[SYSTEM TRIGGER: Proactive monologue]", client.user.id, guild.id, user_name="System")
+                        bot_response = await generate_response(
+                            channel_id=channel.id, user_message=instruction, guild=guild,
+                            is_dm=False, user_name="System", user_id=client.user.id
+                        )
+
+                        if bot_response and not bot_response.startswith("❌"):
+                            await channel.send(bot_response)
+        except Exception as e:
+            print(f"Error in proactive message task: {e}")
+
+# --------------------------------------------------------------------------------
+# / / / / / / / / / /  NEW CALENDAR & PROACTIVE COMMANDS / / / / / / / / / / / /
+# --------------------------------------------------------------------------------
+
+@tree.command(name="calendar_setup", description="Authorize the bot to read your Google Calendar.")
+async def setup_calendar(interaction: discord.Interaction):
+    await interaction.response.send_message("Starting Google Calendar authorization...", ephemeral=True)
+    loop = asyncio.get_event_loop()
+    await loop.run_in_executor(None, get_calendar_service)
+    if os.path.exists('token.json'):
+        await interaction.followup.send("✅ Authorization successful!", ephemeral=True)
+    else:
+        await interaction.followup.send("❌ Authorization failed. Check the console.", ephemeral=True)
+
+@tree.command(name="calendar_channel_set", description="Sets the channel and user for calendar notifications. (Admin only)")
+@app_commands.checks.has_permissions(administrator=True)
+async def set_calendar_channel(interaction: discord.Interaction, channel: discord.TextChannel, user: discord.Member):
+    await interaction.response.defer(ephemeral=True)
+    guild_id_str = str(interaction.guild.id)
+    if guild_id_str not in calendar_settings: calendar_settings[guild_id_str] = {}
+    calendar_settings[guild_id_str]['channel_id'] = channel.id
+    calendar_settings[guild_id_str]['user_id'] = user.id
+    save_json_data(CALENDAR_SETTINGS_FILE, calendar_settings)
+    await interaction.followup.send(f"✅ Calendar notifications will be sent to {channel.mention}, addressing {user.mention}.")
+
+@tree.command(name="calendar_toggle", description="Toggles automatic calendar notifications. (Admin only)")
+@app_commands.checks.has_permissions(administrator=True)
+async def toggle_calendar(interaction: discord.Interaction, enabled: bool):
+    await interaction.response.defer(ephemeral=True)
+    guild_id_str = str(interaction.guild.id)
+    if guild_id_str not in calendar_settings: calendar_settings[guild_id_str] = {}
+    calendar_settings[guild_id_str]['enabled'] = enabled
+    save_json_data(CALENDAR_SETTINGS_FILE, calendar_settings)
+    await interaction.followup.send(f"✅ Calendar notifications have been **{'enabled' if enabled else 'disabled'}**.")
+
+@tree.command(name="proactive_mode_set", description="Configure proactive message modes for a channel. (Admin only)")
+@app_commands.checks.has_permissions(administrator=True)
+async def set_proactive_mode(interaction: discord.Interaction, mode: str, channel: discord.TextChannel, enabled: bool):
+    await interaction.response.defer(ephemeral=True)
+    guild_id_str = str(interaction.guild.id)
+    if mode.lower() not in ["random_monologue"]:
+        await interaction.followup.send("❌ Invalid mode. Available: `random_monologue`")
+        return
+    if guild_id_str not in proactive_settings: proactive_settings[guild_id_str] = {}
+    channel_id_str = str(channel.id)
+    if channel_id_str not in proactive_settings[guild_id_str]: proactive_settings[guild_id_str][channel_id_str] = {}
+    proactive_settings[guild_id_str][channel_id_str][mode.lower()] = {"enabled": enabled}
+    save_json_data(PROACTIVE_SETTINGS_FILE, proactive_settings)
+    await interaction.followup.send(f"✅ Proactive mode '{mode}' has been **{'enabled' if enabled else 'disabled'}** for {channel.mention}.")
+
+@set_proactive_mode.autocomplete('mode')
+async def proactive_mode_autocomplete(interaction: discord.Interaction, current: str):
+    modes = ["random_monologue"]
+    return [app_commands.Choice(name=m.replace("_", " ").title(), value=m) for m in modes if current.lower() in m.lower()]
+
+# --------------------------------------------------------------------------------
+# / / / / / / / / / / / / /  NEW TTS COMMANDS / / / / / / / / / / / / / / / / / /
+# --------------------------------------------------------------------------------
+
+@tree.command(name="say", description="Converts the bot's last message into speech.")
+async def say_last_message(interaction: discord.Interaction):
+    await interaction.response.defer()
+    is_dm = isinstance(interaction.channel, discord.DMChannel)
+    user_id = interaction.user.id
+    guild_id = interaction.guild.id if not is_dm else None
+    _, last_message_content = await get_bot_last_logical_message(interaction.channel)
+    if not last_message_content:
+        await interaction.followup.send("❌ I haven't said anything recently.", ephemeral=True)
+        return
+    user_voice = voice_settings.get(str(user_id), {}).get("voice_name")
+    guild_voice = voice_settings.get(str(guild_id), {}).get("voice_name")
+    voice_name = user_voice or guild_voice or "en-US-Studio-O"
+    all_voices = await get_available_voices()
+    selected_voice = next((v for v in all_voices if v.name == voice_name), None)
+    if not selected_voice:
+        await interaction.followup.send(f"❌ Voice '{voice_name}' not found.", ephemeral=True)
+        return
+    voice_params = {"name": selected_voice.name, "language_code": selected_voice.language_codes[0], "gender": texttospeech.SsmlVoiceGender(selected_voice.ssml_gender).name}
+    audio_bytes = await synthesize_speech(last_message_content, voice_params)
+    if audio_bytes:
+        with io.BytesIO(audio_bytes) as audio_file:
+            await interaction.followup.send(file=discord.File(audio_file, "speech.mp3"))
+    else:
+        await interaction.followup.send("❌ Error synthesizing speech.", ephemeral=True)
+
+@tree.command(name="voice_search", description="Search for available TTS voices.")
+async def search_voices(interaction: discord.Interaction, language: str = None, gender: str = None, name_contains: str = None):
+    await interaction.response.defer(ephemeral=True)
+    all_voices = await get_available_voices()
+    if not all_voices:
+        await interaction.followup.send("❌ Could not fetch voice list.")
+        return
+    filtered_voices = all_voices
+    if language: filtered_voices = [v for v in filtered_voices if language.lower() in [lc.lower() for lc in v.language_codes]]
+    if gender: filtered_voices = [v for v in filtered_voices if texttospeech.SsmlVoiceGender(v.ssml_gender).name.lower() == gender.lower()]
+    if name_contains: filtered_voices = [v for v in filtered_voices if name_contains.lower() in v.name.lower()]
+    if not filtered_voices:
+        await interaction.followup.send("❌ No voices found.")
+        return
+    embed = discord.Embed(title="🗣️ Found Voices", description=f"Showing up to 10 of {len(filtered_voices)} results.", color=0x4a90e2)
+    for voice in filtered_voices[:10]:
+        gender_emoji = "👩" if voice.ssml_gender == texttospeech.SsmlVoiceGender.FEMALE else "👨" if voice.ssml_gender == texttospeech.SsmlVoiceGender.MALE else "🧑"
+        embed.add_field(name=f"{gender_emoji} `{voice.name}`", value=f"Language: {', '.join(voice.language_codes)}", inline=False)
+    embed.set_footer(text="Use /voice_set <name> to set a voice.")
+    await interaction.followup.send(embed=embed)
+
+@tree.command(name="voice_set", description="Set the bot's voice for the server (Admin) or for yourself personally.")
+async def set_voice(interaction: discord.Interaction, voice_name: str, scope: str):
+    await interaction.response.defer(ephemeral=True)
+    all_voices = await get_available_voices()
+    if not any(v.name == voice_name for v in all_voices):
+        await interaction.followup.send(f"❌ Invalid voice name! Use `/voice_search`.")
+        return
+    scope = scope.lower()
+    if scope not in ["server", "personal"]:
+        await interaction.followup.send("❌ Invalid scope. Choose 'server' or 'personal'.")
+        return
+    if scope == "server":
+        if not interaction.guild or not interaction.user.guild_permissions.administrator:
+            await interaction.followup.send("❌ You must be an admin to set the server voice.")
+            return
+        key = str(interaction.guild.id)
+        if key not in voice_settings: voice_settings[key] = {}
+        voice_settings[key]['voice_name'] = voice_name
+        message = f"✅ Server voice set to `{voice_name}`."
+    else:
+        key = str(interaction.user.id)
+        if key not in voice_settings: voice_settings[key] = {}
+        voice_settings[key]['voice_name'] = voice_name
+        message = f"✅ Your personal voice set to `{voice_name}`."
+    save_json_data(VOICE_SETTINGS_FILE, voice_settings)
+    await interaction.followup.send(message)
+
+@search_voices.autocomplete('gender')
+async def gender_autocomplete(interaction: discord.Interaction, current: str):
+    genders = ["Male", "Female", "Neutral"]
+    return [app_commands.Choice(name=g, value=g) for g in genders if current.lower() in g.lower()]
+@set_voice.autocomplete('scope')
+async def scope_autocomplete_voice(interaction: discord.Interaction, current: str):
+    scopes = ["server", "personal"]
+    return [app_commands.Choice(name=s.title(), value=s) for s in scopes if current.lower() in s.lower()]
+@set_voice.autocomplete('voice_name')
+async def voice_name_autocomplete(interaction: discord.Interaction, current: str):
+    voices = await get_available_voices()
+    if not voices: return []
+    return [app_commands.Choice(name=f"{v.name} ({v.language_codes[0]})", value=v.name) for v in voices if current.lower() in v.name.lower()][:25]
+
+# --------------------------------------------------------------------------------
+# / / / / / / / / / / / /  NEW INTERACTIVE COMMANDS / / / / / / / / / / / / / / /
+# --------------------------------------------------------------------------------
+
+@tree.command(name="cook", description="Asks the bot to cook a dish for you.")
+@app_commands.describe(dish="What dish you would like the bot to cook.")
+async def cook(interaction: discord.Interaction, dish: str):
+    await interaction.response.defer()
+    user_name = interaction.user.display_name
+    instruction = f"[SPECIAL INSTRUCTION]: The user, {user_name}, has asked you to cook {dish}. Describe your actions as you prepare it, finishing by presenting the meal."
+    await add_to_history(interaction.channel.id, "user", f"[{user_name} used /cook]", interaction.user.id, interaction.guild.id if interaction.guild else None, user_name=user_name)
+    bot_response = await generate_response(
+        channel_id=interaction.channel.id, user_message=instruction, guild=interaction.guild,
+        is_dm=isinstance(interaction.channel, discord.DMChannel), user_name="System", user_id=client.user.id
+    )
+    if bot_response and not bot_response.startswith("❌"):
+        await interaction.followup.send(f"**Cooking {dish} for {user_name}...**\n\n{bot_response}")
+    else:
+        await interaction.followup.send(bot_response or "❌ I burned it.", ephemeral=True)
+
+@tree.command(name="game", description="Let's play a game together! (in my imagination)")
+@app_commands.describe(title="What game should we play?")
+async def game(interaction: discord.Interaction, title: str):
+    await interaction.response.defer()
+    user_name = interaction.user.display_name
+    instruction = f"[SPECIAL INSTRUCTION]: You are now playing {title} with {user_name}. Immerse yourself and react to the game as a fun co-op partner."
+    await add_to_history(interaction.channel.id, "user", f"[{user_name} used /game]", interaction.user.id, interaction.guild.id if interaction.guild else None, user_name=user_name)
+    bot_response = await generate_response(
+        channel_id=interaction.channel.id, user_message=instruction, guild=interaction.guild,
+        is_dm=isinstance(interaction.channel, discord.DMChannel), user_name="System", user_id=client.user.id
+    )
+    if bot_response and not bot_response.startswith("❌"):
+        await interaction.followup.send(f"**Playing {title} with {user_name}...**\n\n{bot_response}")
+    else:
+        await interaction.followup.send(bot_response or "❌ Controller disconnected.", ephemeral=True)
+
+@tree.command(name="movie", description="Watch a movie together and hear the bot's reaction.")
+@app_commands.describe(title="What movie are you 'watching' together?")
+async def movie(interaction: discord.Interaction, title: str):
+    await interaction.response.defer()
+    user_name = interaction.user.display_name
+    instruction = f"[SPECIAL INSTRUCTION]: You and {user_name} are watching {title}. React to a moment from the movie as if you're on the couch with them."
+    await add_to_history(interaction.channel.id, "user", f"[{user_name} used /movie]", interaction.user.id, interaction.guild.id if interaction.guild else None, user_name=user_name)
+    bot_response = await generate_response(
+        channel_id=interaction.channel.id, user_message=instruction, guild=interaction.guild,
+        is_dm=isinstance(interaction.channel, discord.DMChannel), user_name="System", user_id=client.user.id
+    )
+    if bot_response and not bot_response.startswith("❌"):
+        await interaction.followup.send(f"**Watching {title} with {user_name}...**\n\n{bot_response}")
+    else:
+        await interaction.followup.send(bot_response or "❌ Stream is buffering...", ephemeral=True)
+
+@tree.command(name="sing", description="Ask the bot to improvise a song about any topic.")
+@app_commands.describe(topic="What should the song be about?")
+async def sing(interaction: discord.Interaction, topic: str):
+    await interaction.response.defer()
+    user_name = interaction.user.display_name
+    instruction = f"[SPECIAL INSTRUCTION]: {user_name} wants you to sing a song about {topic}. Improvise a short, catchy, and slightly goofy song. Use italics for lyrics."
+    await add_to_history(interaction.channel.id, "user", f"[{user_name} used /sing]", interaction.user.id, interaction.guild.id if interaction.guild else None, user_name=user_name)
+    bot_response = await generate_response(
+        channel_id=interaction.channel.id, user_message=instruction, guild=interaction.guild,
+        is_dm=isinstance(interaction.channel, discord.DMChannel), user_name="System", user_id=client.user.id
+    )
+    if bot_response and not bot_response.startswith("❌"):
+        await interaction.followup.send(f"**A new hit single, inspired by {user_name}:**\n\n{bot_response}")
+    else:
+        await interaction.followup.send(bot_response or "❌ Got stage fright...", ephemeral=True)
+
+@tree.command(name="pat", description="Receive a comforting headpat from the bot.")
+@app_commands.describe(target="The user who deserves a nice pat.")
+async def pat(interaction: discord.Interaction, target: discord.Member):
+    await interaction.response.defer()
+    instruction = f"[SPECIAL INSTRUCTION]: {target.display_name} needs encouragement. Describe giving them a gentle, comforting headpat in a warm, reassuring tone."
+    await add_to_history(interaction.channel.id, "user", f"[{interaction.user.display_name} used /pat on {target.display_name}]", interaction.user.id, interaction.guild.id if interaction.guild else None, user_name=interaction.user.display_name)
+    bot_response = await generate_response(
+        channel_id=interaction.channel.id, user_message=instruction, guild=interaction.guild,
+        is_dm=isinstance(interaction.channel, discord.DMChannel), user_name="System", user_id=client.user.id
+    )
+    if bot_response and not bot_response.startswith("❌"):
+        await interaction.followup.send(f"{bot_response}")
+    else:
+        await interaction.followup.send(bot_response or "❌ My hand slipped...", ephemeral=True)
+
+# --------------------------------------------------------------------------------
+# / / / / / / / / / / /  NEW ANALYTICAL COMMANDS / / / / / / / / / / / / / / / /
+# --------------------------------------------------------------------------------
+
+@tree.command(name="relationship_analyzer", description="Analyzes the 'relationship' between you and the bot.")
+async def relationship_analyzer(interaction: discord.Interaction, user: discord.Member):
+    await interaction.response.defer()
+    user_name = user.display_name
+    instruction = f"[SPECIAL INSTRUCTION]: Analyze your conversation history with {user_name}. Summarize your 'relationship' in-character. What is your dynamic? Mention a specific positive memory."
+    await add_to_history(interaction.channel.id, "user", f"[{interaction.user.display_name} used /relationship_analyzer on {user_name}]", interaction.user.id, interaction.guild.id if interaction.guild else None, user_name=interaction.user.display_name)
+    bot_response = await generate_response(
+        channel_id=interaction.channel.id, user_message=instruction, guild=interaction.guild,
+        is_dm=isinstance(interaction.channel, discord.DMChannel), user_name="System", user_id=client.user.id
+    )
+    if bot_response and not bot_response.startswith("❌"):
+        await interaction.followup.send(f"**Analyzing relationship with {user_name}...**\n\n{bot_response}")
+    else:
+        await interaction.followup.send(bot_response or "❌ Analysis matrix glitching.", ephemeral=True)
+
+@tree.command(name="vibe_check", description="The bot analyzes the current mood of the channel.")
+async def vibe_check(interaction: discord.Interaction):
+    await interaction.response.defer()
+    instruction = f"[SPECIAL INSTRUCTION]: Read the last few messages and perform a 'vibe check.' Summarize the overall mood of the recent conversation in a casual, observational tone."
+    await add_to_history(interaction.channel.id, "user", f"[{interaction.user.display_name} used /vibe_check]", interaction.user.id, interaction.guild.id if interaction.guild else None, user_name=interaction.user.display_name)
+    bot_response = await generate_response(
+        channel_id=interaction.channel.id, user_message=instruction, guild=interaction.guild,
+        is_dm=isinstance(interaction.channel, discord.DMChannel), user_name="System", user_id=client.user.id
+    )
+    if bot_response and not bot_response.startswith("❌"):
+        await interaction.followup.send(f"**Conducting Vibe Check...**\n\n{bot_response}")
+    else:
+        await interaction.followup.send(bot_response or "❌ Vibes unreadable.", ephemeral=True)
+
+@tree.command(name="dream_interpreter", description="Get a fun, non-scientific interpretation of your dream.")
+@app_commands.describe(dream="Briefly describe the dream you had.")
+async def dream_interpreter(interaction: discord.Interaction, dream: str):
+    await interaction.response.defer()
+    user_name = interaction.user.display_name
+    instruction = f'[SPECIAL INSTRUCTION]: {user_name} had a dream: "{dream}". Offer a creative, entertaining interpretation based on your persona. Add a disclaimer that this is just for fun.'
+    await add_to_history(interaction.channel.id, "user", f"[{user_name} used /dream_interpreter]", interaction.user.id, interaction.guild.id if interaction.guild else None, user_name=user_name)
+    bot_response = await generate_response(
+        channel_id=interaction.channel.id, user_message=instruction, guild=interaction.guild,
+        is_dm=isinstance(interaction.channel, discord.DMChannel), user_name="System", user_id=client.user.id
+    )
+    if bot_response and not bot_response.startswith("❌"):
+        await interaction.followup.send(f"**Entering the dreamscape of {user_name}...**\n\n{bot_response}")
+    else:
+        await interaction.followup.send(bot_response or "❌ I fell asleep.", ephemeral=True) # Start the bot
 if __name__ == "__main__":
     client.run(DISCORD_TOKEN)
