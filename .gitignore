@@ -179,3 +179,14 @@ cython_debug/
 #  refer to https://docs.cursor.com/context/ignore-files
 .cursorignore
 .cursorindexingignore
+
+# .gitignore 파일 맨 아래에 추가할 내용
+
+# ---------------------------------
+# Project-specific ignores
+
+# Google Cloud authentication files
+*.json  # <-- credentials.json, token.json, 서비스 계정 키 등 모든 .json 파일을 제외합니다.
+
+# Discord bot's persistent data
+bot_data/ # <-- 봇이 생성하는 모든 데이터 파일(설정, 메모리, 로그 등)을 제외합니다.
