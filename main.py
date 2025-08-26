@@ -2614,12 +2614,14 @@ def get_system_prompt(guild_id: int, guild: discord.Guild = None, query: str = N
         if user_lore:
             combined_prompt += f"\n\n<lore>User's lore:\n• About {username}: {user_lore}</lore>"
             
-    # --- START: 수정된 부분 ---
-    # 'now' 변수 정의를 if문 밖으로 이동시켜 항상 값이 할당되도록 합니다.
-    now = dt.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    # --- START: ★★★★★ 최종 수정된 시간 설정 부분 ★★★★★ ---
+    # 서버의 UTC 시간이 아닌, 한국 표준시(KST, UTC+9)를 명시적으로 사용합니다.
+    kst = dt.timezone(dt.timedelta(hours=9))
+    now = dt.datetime.now(kst).strftime("%Y-%m-%d %H:%M:%S")
+    # --- END: ★★★★★ 최종 수정된 시간 설정 부분 ★★★★★ ---
+            
     time_info = f"\n\n<time>The current real-world time is {now}. You should be aware of the time of day.</time>"
     combined_prompt += time_info
-    # --- END: 수정된 부분 ---
 
     return combined_prompt
 
