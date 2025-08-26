@@ -30,6 +30,14 @@ from typing import Dict, List, Optional
 import time
 import logging
 import warnings
+# New Imports for Calendar and Advanced Scheduling
+from google.cloud import texttospeech
+from google.auth.transport.requests import Request
+from google.oauth2.credentials import Credentials
+from google_auth_oauthlib.flow import InstalledAppFlow
+from googleapiclient.discovery import build
+from googleapiclient.errors import HttpError
+import datetime as dt
 
 # Suppress Discord connection warnings/errors
 logging.getLogger('discord').setLevel(logging.CRITICAL)
@@ -63,6 +71,9 @@ tree = app_commands.CommandTree(client)
 # Data persistence paths
 DATA_DIR = "bot_data"
 os.makedirs(DATA_DIR, exist_ok=True)
+CALENDAR_SETTINGS_FILE = os.path.join(DATA_DIR, "calendar_settings.json")
+PROACTIVE_SETTINGS_FILE = os.path.join(DATA_DIR, "proactive_settings.json")
+VOICE_SETTINGS_FILE = os.path.join(DATA_DIR, "voice_settings.json")
 
 PROMPT_SETTINGS_FILE = os.path.join(DATA_DIR, "prompt_settings.json")
 DM_PROMPT_SETTINGS_FILE = os.path.join(DATA_DIR, "dm_prompt_settings.json")
@@ -1825,6 +1836,10 @@ guild_dm_enabled: Dict[int, bool] = load_json_data(DM_ENABLED_FILE)
 bot_persona_name: str = "Assistant"
 recently_deleted_dm_messages: Dict[int, Set[int]] = {}
 custom_prompts: Dict[int, Dict[str, Dict[str, str]]] = {}
+calendar_settings = load_json_data(CALENDAR_SETTINGS_FILE)
+proactive_settings = load_json_data(PROACTIVE_SETTINGS_FILE)
+voice_settings = load_json_data(VOICE_SETTINGS_FILE)
+available_voices_cache = None # TTS 목소리 목록 캐시
 
 # Initialize managers
 lore_book = LoreBook()
@@ -3101,6 +3116,8 @@ async def on_ready():
     
     # Start the background task for DM check-ups
     asyncio.create_task(check_up_task())
+    asyncio.create_task(calendar_check_task())
+    asyncio.create_task(proactive_message_task())
     
     await tree.sync()
     print("Bot is ready!")
@@ -4801,56 +4818,56 @@ async def show_prompt_info(interaction: discord.Interaction):
 
 # PERSONALITY COMMANDS
 
-@tree.command(name="personality_create", description="Create a new personality for the bot (Admin only)")
-async def create_personality(interaction: discord.Interaction, name: str, display_name: str, personality_prompt: str):
-    """Create new custom personality for server"""
-    await interaction.response.defer(ephemeral=True)
+# A Modal class for creating personalities.
+class PersonalityModal(discord.ui.Modal, title="Create New Custom Personality"):
+    name_input = discord.ui.TextInput(
+        label="Personality Name (Short Identifier)",
+        placeholder="e.g., cynical_detective, cheerful_barista",
+        required=True,
+        style=discord.TextStyle.short,
+        max_length=32
+    )
     
-    if not interaction.guild:
-        await interaction.followup.send("Personalities can only be created in servers, not DMs.")
-        return
-    
-    # Check admin permissions
-    if not check_admin_permissions(interaction):
-        await interaction.followup.send("❌ Only administrators can create personalities!")
-        return
-    
-    # Validate input parameters
-    if not (2 <= len(name) <= 32):
-        await interaction.followup.send("Personality name must be between 2 and 32 characters.")
-        return
-    
-    if not (2 <= len(display_name) <= 64):
-        await interaction.followup.send("Display name must be between 2 and 64 characters.")
-        return
-    
-    if not (10 <= len(personality_prompt) <= 2000):
-        await interaction.followup.send("Personality prompt must be between 10 and 2000 characters.")
-        return
-    
-    clean_name = name.lower().replace(" ", "_")
-    
-    # Initialize guild's custom personalities if needed
-    if interaction.guild.id not in custom_personalities:
-        custom_personalities[interaction.guild.id] = {}
-    
-    # Check for existing personality
-    if clean_name in custom_personalities[interaction.guild.id]:
-        await interaction.followup.send(f"Personality '{clean_name}' already exists! Use `/personality_edit` to modify it.")
-        return
-    
-    # Create personality
-    custom_personalities[interaction.guild.id][clean_name] = {
-        "name": display_name,
-        "prompt": personality_prompt
-    }
-    
-    save_personalities()
-    
-    prompt_preview = personality_prompt[:100] + ('...' if len(personality_prompt) > 100 else '')
-    await interaction.followup.send(f"✅ Created personality **{display_name}** (`{clean_name}`)!\n"
-                                   f"Use `/personality_set {clean_name}` to activate it.\n\n"
-                                   f"**Prompt preview:** {prompt_preview}")
+    display_name_input = discord.ui.TextInput(
+        label="Display Name (How the bot is called)",
+        placeholder="e.g., Detective Miles, Sunny",
+        required=True,
+        style=discord.TextStyle.short,
+        max_length=64
+    )
+
+    prompt_input = discord.ui.TextInput(
+        label="Personality Prompt (Up to 4000 characters)",
+        placeholder="Describe the personality, tone, speaking style, and key traits here...",
+        required=True,
+        style=discord.TextStyle.paragraph,
+        max_length=4000
+    )
+
+    async def on_submit(self, interaction: discord.Interaction):
+        guild_id = interaction.guild.id
+        clean_name = self.name_input.value.lower().replace(" ", "_")
+
+        if guild_id not in custom_personalities:
+            custom_personalities[guild_id] = {}
+
+        if clean_name in custom_personalities[guild_id] or clean_name == "default":
+            await interaction.response.send_message(
+                f"❌ A personality with the identifier '{clean_name}' already exists. Please choose a different name.",
+                ephemeral=True
+            )
+            return
+
+        custom_personalities[guild_id][clean_name] = {
+            "name": self.display_name_input.value,
+            "prompt": self.prompt_input.value
+        }
+        save_personalities()
+
+        await interaction.response.send_message(
+            f"✅ Personality **'{self.display_name_input.value}'** (`{clean_name}`) created successfully!",
+            ephemeral=True
+        )
 
 @tree.command(name="personality_set", description="Set the active personality for this server (Admin only)")
 async def set_personality(interaction: discord.Interaction, personality_name: str = None):
@@ -4911,6 +4928,19 @@ async def set_personality(interaction: discord.Interaction, personality_name: st
     save_personalities()
     await interaction.followup.send(f"✅ Bot personality set to **{display_name}** (`{clean_name}`)!\n"
                                    f"💡 This personality will also be used in DMs with server members.")
+
+
+# The actual slash command that opens the modal.
+@tree.command(name="personality_create", description="Opens a form to create a new custom personality for the bot.")
+async def personality_create(interaction: discord.Interaction):
+    """Opens a pop-up modal for the user to create a new personality."""
+    if not interaction.guild:
+        await interaction.response.send_message("This command can only be used in a server.", ephemeral=True)
+        return
+    if not interaction.user.guild_permissions.administrator:
+        await interaction.response.send_message("❌ Only administrators can use this command!", ephemeral=True)
+        return
+    await interaction.response.send_modal(PersonalityModal())
 
 @tree.command(name="personality_list", description="List all personalities for this server")
 async def list_personalities(interaction: discord.Interaction):
@@ -5964,6 +5994,108 @@ async def view_memory(interaction: discord.Interaction, memory_number: int):
 
 # UTILITY COMMANDS
 
+# --------------------------------------------------------------------------------
+# / / / / / / / / / / / /  NEW HELPER FUNCTIONS / / / / / / / / / / / / / / /
+# --------------------------------------------------------------------------------
+
+# --- Google Calendar Functions ---
+SCOPES = ['https://www.googleapis.com/auth/calendar.readonly']
+
+def get_calendar_service():
+    """Creates and returns a Google Calendar API service object."""
+    creds = None
+    if os.path.exists('token.json'):
+        creds = Credentials.from_authorized_user_file('token.json', SCOPES)
+    
+    if not creds or not creds.valid:
+        if creds and creds.expired and creds.refresh_token:
+            try:
+                creds.refresh(Request())
+            except Exception as e:
+                print(f"Error refreshing token: {e}. Please re-authenticate.")
+                if os.path.exists('token.json'): os.remove('token.json')
+                creds = None
+        
+        if not creds:
+            if not os.path.exists('credentials.json'):
+                print("ERROR: credentials.json not found.")
+                return None
+            flow = InstalledAppFlow.from_client_secrets_file('credentials.json', SCOPES)
+            creds = flow.run_local_server(port=0)
+        
+        with open('token.json', 'w') as token:
+            token.write(creds.to_json())
+    
+    try:
+        service = build('calendar', 'v3', credentials=creds)
+        return service
+    except HttpError as error:
+        print(f'An error occurred with Google API: {error}')
+        return None
+
+async def fetch_upcoming_events(service, minutes_ahead=15):
+    """Fetches calendar events starting within the specified time."""
+    if not service: return []
+    now = dt.datetime.utcnow().isoformat() + 'Z'
+    time_max = (dt.datetime.utcnow() + dt.timedelta(minutes=minutes_ahead)).isoformat() + 'Z'
+    try:
+        events_result = await asyncio.to_thread(
+            service.events().list(
+                calendarId='primary', timeMin=now, timeMax=time_max,
+                maxResults=5, singleEvents=True, orderBy='startTime'
+            ).execute
+        )
+        return events_result.get('items', [])
+    except Exception as e:
+        print(f"Error fetching calendar events: {e}")
+        return []
+
+# --- Google Text-to-Speech Functions ---
+def get_tts_client():
+    """Returns an authenticated Text-to-Speech client."""
+    try:
+        return texttospeech.TextToSpeechClient()
+    except Exception as e:
+        print(f"Failed to create TTS client: {e}")
+        return None
+
+async def synthesize_speech(text: str, voice_params: dict) -> bytes:
+    """Synthesizes speech from text and returns the audio content as bytes."""
+    tts_client = get_tts_client()
+    if not tts_client: return None
+    synthesis_input = texttospeech.SynthesisInput(text=text)
+    voice = texttospeech.VoiceSelectionParams(
+        language_code=voice_params.get("language_code", "en-US"),
+        name=voice_params.get("name", "en-US-Studio-O"),
+        ssml_gender=texttospeech.SsmlVoiceGender[voice_params.get("gender", "FEMALE").upper()]
+    )
+    audio_config = texttospeech.AudioConfig(
+        audio_encoding=texttospeech.AudioEncoding.MP3,
+        speaking_rate=voice_params.get("speaking_rate", 1.0),
+        pitch=voice_params.get("pitch", 0.0)
+    )
+    try:
+        response = await asyncio.to_thread(
+            tts_client.synthesize_speech,
+            input=synthesis_input, voice=voice, audio_config=audio_config
+        )
+        return response.audio_content
+    except Exception as e:
+        print(f"Error during speech synthesis: {e}")
+        return None
+
+async def get_available_voices():
+    """Gets and caches a list of available TTS voices."""
+    global available_voices_cache
+    if available_voices_cache: return available_voices_cache
+    tts_client = get_tts_client()
+    if not tts_client: return []
+    print("Fetching available TTS voices from Google Cloud...")
+    voices = await asyncio.to_thread(tts_client.list_voices)
+    available_voices_cache = voices.voices
+    print(f"Cached {len(available_voices_cache)} voices.")
+    return available_voices_cache
+    
 @tree.command(name="delete_messages", description="Delete the bot's last N messages from this channel/DM")
 async def delete_messages(interaction: discord.Interaction, number: int):
     """Delete bot's last N logical messages from channel or DM"""
