@@ -6082,6 +6082,13 @@ async def synthesize_speech(text: str, voice_params: dict) -> bytes:
         speaking_rate=voice_params.get("speaking_rate", 1.0),
         pitch=voice_params.get("pitch", 0.0)
     )
+
+    # --- START: 수정된 부분 ---
+    # Studio 또는 Polyglot 음성은 'gemini-1.0-pro' 모델을 명시해야 합니다.
+    if "studio" in voice.name.lower() or "polyglot" in voice.name.lower():
+        audio_config.model = "gemini-1.0-pro"
+    # --- END: 수정된 부분 ---
+
     try:
         response = await asyncio.to_thread(
             tts_client.synthesize_speech,
@@ -6091,7 +6098,6 @@ async def synthesize_speech(text: str, voice_params: dict) -> bytes:
     except Exception as e:
         print(f"Error during speech synthesis: {e}")
         return None
-
 async def get_available_voices():
     """Gets and caches a list of available TTS voices."""
     global available_voices_cache
