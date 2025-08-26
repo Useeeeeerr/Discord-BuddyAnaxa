@@ -6092,14 +6092,18 @@ async def synthesize_speech(text: str, voice_params: dict) -> bytes:
         print("[TTS Error] TTS Client is not available.")
         return None
         
+    # --- START: 오타가 ★완전히★ 수정된 부분 ---
+    # texttospech -> texttospeech 로 수정되었습니다.
     synthesis_input = texttospeech.SynthesisInput(text=text)
-    voice = texttospech.VoiceSelectionParams(
+    # --- END: 수정된 부분 ---
+
+    voice = texttospeech.VoiceSelectionParams(
         language_code=voice_params.get("language_code", "en-US"),
         name=voice_params.get("name", "en-US-Studio-O"),
-        ssml_gender=texttospech.SsmlVoiceGender[voice_params.get("gender", "FEMALE").upper()]
+        ssml_gender=texttospeech.SsmlVoiceGender[voice_params.get("gender", "FEMALE").upper()]
     )
-    audio_config = texttospech.AudioConfig(
-        audio_encoding=texttospech.AudioEncoding.MP3,
+    audio_config = texttospeech.AudioConfig(
+        audio_encoding=texttospeech.AudioEncoding.MP3,
         speaking_rate=voice_params.get("speaking_rate", 1.0),
         pitch=voice_params.get("pitch", 0.0)
     )
