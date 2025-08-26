@@ -7192,17 +7192,30 @@ async def proactive_message_task():
 # --------------------------------------------------------------------------------
 # / / / / / / / / / /  NEW CALENDAR & PROACTIVE COMMANDS / / / / / / / / / / / /
 # --------------------------------------------------------------------------------
-
-@tree.command(name="calendar_setup", description="Authorize the bot to read your Google Calendar.")
+@tree.command(name="calendar_setup", description="Tests the connection to your Google Calendar.")
 async def setup_calendar(interaction: discord.Interaction):
-    await interaction.response.send_message("Starting Google Calendar authorization...", ephemeral=True)
-    loop = asyncio.get_event_loop()
-    await loop.run_in_executor(None, get_calendar_service)
-    if os.path.exists('token.json'):
-        await interaction.followup.send("✅ Authorization successful!", ephemeral=True)
-    else:
-        await interaction.followup.send("❌ Authorization failed. Check the console.", ephemeral=True)
+    """Tests if the bot can connect to Google Calendar using the current environment variables."""
+    await interaction.response.send_message("Testing Google Calendar connection with service account...", ephemeral=True)
 
+    # 더 이상 파일을 생성하지 않으므로, 함수를 직접 호출하여 결과를 확인합니다.
+    # get_calendar_service 함수는 동기 함수이므로 바로 호출할 수 있습니다.
+    calendar_service = get_calendar_service()
+
+    # 함수가 성공적으로 서비스 객체(연결 정보)를 반환했는지 확인합니다.
+    if calendar_service is not None:
+        await interaction.followup.send("✅ **Connection Successful!** The bot can now access the shared Google Calendar.", ephemeral=True)
+    else:
+        # get_calendar_service 함수 내부에서 이미 콘솔에 자세한 에러를 출력합니다.
+        await interaction.followup.send(
+            "❌ **Connection Failed.** Please check the console logs for specific errors. \n\n"
+            "**Common issues to check:**\n"
+            "1. Is the `GOOGLE_CREDENTIALS_JSON` environment variable set correctly?\n"
+            "2. Is the `GOOGLE_CALENDAR_ID` correct?\n"
+            "3. Did you share your calendar with the service account's email address?\n"
+            "4. Is the 'Google Calendar API' enabled in your Google Cloud project?",
+            ephemeral=True
+        )
+        
 @tree.command(name="calendar_channel_set", description="Sets the channel and user for calendar notifications. (Admin only)")
 @app_commands.checks.has_permissions(administrator=True)
 async def set_calendar_channel(interaction: discord.Interaction, channel: discord.TextChannel, user: discord.Member):
